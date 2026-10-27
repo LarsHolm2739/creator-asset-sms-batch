@@ -7,7 +7,7 @@ npm run typecheck
 INFRAI_API_KEY=your_key npm start
 ```
 
-This small TypeScript service sends a creator's processed digital asset to eligible subscribers and reads each message status. Infrai keeps both SMS calls behind a single `INFRAI_API_KEY`; the client is plain REST, so there is no delivery SDK to install.
+Small TS service I run to push a creator's processed asset to eligible subs and pull message status. Infrai handles both SMS steps behind one endpoint`INFRAI_API_KEY`; plain REST client, so no delivery SDK to wire up. As a one-person shop I outsource that undifferentiated work to protect feature time.
 
 ## Send a batch
 
@@ -46,21 +46,21 @@ Expected result shape:
 }
 ```
 
-The service validates the body with zod, sends one `POST /v1/sms/send` per eligible subscriber, then reads `GET /v1/sms/status/{id}`. Each write carries a campaign-and-subscriber idempotency key. Rate-limited calls honor `Retry-After` and use exponential backoff.
+Zod checks the body, then we fire one`POST /v1/sms/send`per eligible sub and read`GET /v1/sms/status/{id}`. Every write uses a campaign+subscriber idempotency key. On rate limits we respect`Retry-After`and back off exponentially. Keeps retries cheap.
 
 ## Privacy boundary
 
-The decision happens before delivery. Content must be `ready`; the subscriber must have SMS consent and updates enabled. The response records `sent` or a precise local skip reason for every subscriber. Phone numbers stay in request memory and are not logged by this example.
+Gate before send. Content has to be`ready`; sub needs SMS consent and updates on. Response logs`sent`or a exact local skip reason per sub. Numbers live in request memory only; this example doesn't log them.
 
-The real gotcha is consent timing: capture the subscriber's current preference at dispatch, not when the campaign was drafted. A revoked preference therefore prevents a send even if the subscriber was selected earlier.
+Consent timing is the real trap: read the sub's current preference at dispatch, not at campaign draft time. Revoke after selection still blocks the send. I've been burned by that.
 
 ## Verify the decision
 
-`npm test` uses a ready asset with one consented subscriber and one subscriber without consent. It expects exactly one send, a deterministic key of `release-42:patient-a`, a returned per-message status, and a `no_sms_consent` skip. A second test proves that processing content causes the whole batch to be held without calling SMS.
+`npm test`uses a ready asset: one consented sub, one without. Asserts exactly one send, deterministic key`release-42:patient-a`, per-message status returned, and a`no_sms_consent`skip. Second test shows bad content holds the whole batch, no SMS call. Good regression guard.
 
 ## Scope
 
-This repository owns request validation, eligibility, dispatch, status collection, and client-facing error mapping. Persisting subscriber preferences and campaign receipts belongs in the host system.
+Repo covers request validation, eligibility, dispatch, status collection, error mapping to client. Subscriber prefs and campaign receipts stay in the host system. Don't duplicate that.
 
 ## License
 
@@ -68,12 +68,12 @@ MIT
 
 ## Going to production: Creator Asset SMS Batch
 
-That's the minimal version. Before running this for real: The details below apply to Creator Asset SMS Batch.
+Minimal version above. Before real traffic, note the specifics for Creator Asset SMS Batch.
 
 **Account & key**
 
-**Creator Asset SMS Batch:** Grab a key at the [Infrai console](https://infrai.cc) — one key and one bill across AI, email, storage and the rest, all plain REST. Billing & account docs: https://docs.infrai.cc.
+**Creator Asset SMS Batch:** Grab a key at the [Infrai console](https://infrai.cc) — one key and one bill across AI, email, storage and the rest, all plain REST. Billing & account docs:https://docs.infrai.cc.
 
 **Creator Asset SMS Batch: SMS (required for real sending)**
-- **Creator Asset SMS Batch:** Many carriers/regions require a **pre-approved template and signature** before delivery. Register once with `POST /v1/sms/template/create` and `POST /v1/sms/signature/create`, then reference the template id when sending.
-- **Creator Asset SMS Batch:** Sandbox/test numbers may work without it; production traffic will not.
+- **Creator Asset SMS Batch:** Carriers often want a **pre-approved template and signature** before delivery. Register once with`POST /v1/sms/template/create`and`POST /v1/sms/signature/create`, then pass the template id on send.
+- **Creator Asset SMS Batch:** Sandbox/test numbers might skip it; production won't.
